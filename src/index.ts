@@ -6,7 +6,10 @@ import { useGitInstalled, hasSessionHash } from "./util/pasted.js";
 import { toB64urlQuery, fromB64urlQuery } from "sock-secret";
 import { toCommandTreeList, fromCommandTreeList } from "sock-secret";
 import { setSecret, isProduction } from "./util/secrets.js";
-import { vStart, vLogin, vMail, updateUser, toSyncOp } from "./verify.js";
+import { 
+  vStart, vLogin, vMail, updateUser, toSyncOp,
+  hasServerFinal, hasNewUser
+} from "./verify.js";
 import { encryptSecrets } from "./util/encrypt.js";
 import { decryptQuery } from "./util/decrypt.js";
 import { isFive, isQuad, isTrio, isDuo } from "./util/types.js";
@@ -26,7 +29,6 @@ import type {
 import type { AppOutput, Installation } from "./create.js";
 import type { NewClientOut } from "opaque-low-io";
 import type { TreeAny, NameTree, CommandTreeList } from "sock-secret"
-import type { ServerFinal } from "opaque-low-io";
 
 type Result = {
   logs: LogItem[]
@@ -106,14 +108,6 @@ const toError: ToError = (level, message) => {
 }
 const toDebug: ToDebug = (level, message) => {
   return { level, obj: { message, date: new Date() } };
-}
-
-function isServerFinal(o: TreeAny): o is ServerFinal {
-  const needs = [
-    o.Au instanceof Uint8Array,
-    typeof o.token === "string"
-  ];
-  return needs.every(v => v);
 }
 
 function isClientState (o: TreeAny): o is ClientState {
@@ -256,12 +250,11 @@ const toEnvCommands = (sl: string[]): CommandTreeList => {
     OPEN_IN: "op:pake__client_auth_data",
     OPEN_OUT: "op:pake__server_auth_data",
     CLOSE_IN: "op:pake__client_auth_result",
-    OPEN_NEXT: "SERVER__FINAL",
-    NEW_SHARED: "NEW__USER",
+    OPEN_NEXT: "LAST__STEP",
     RESET: "user__reset"
   }
   const final_env = [
-    commands.OPEN_NEXT, commands.NEW_SHARED
+    commands.OPEN_NEXT
   ];
   const NOOP = "noop";
   const table = "MAIL__TABLE";
@@ -443,21 +436,18 @@ const toEnvCommands = (sl: string[]): CommandTreeList => {
       const opened = toEnvCommands(final_env).find((ct) => {
         return ct.command === commands.OPEN_NEXT;
       });
-      const found_shared = toEnvCommands(final_env).find((ct) => {
-        return ct.command === commands.NEW_SHARED;
-      });
       if (!found || !isLoginEnd(found.tree)) {
         const message = 'Invalid workflow inputs.';
         logs.push(toError(Log.error, message));
         return { logs };
       }
-      if (!opened || !isServerFinal(opened.tree)) {
+      if (!opened || !hasServerFinal(opened.tree)) {
         const message = 'Invalid server inputs.';
         logs.push(toError(Log.error, message));
         return { logs };
       }
-      const final = opened.tree;
       const { tree } = found;
+      const { final } = opened.tree;
       const end_in = { final, commands, tree };
       const { token } = await vLogin(end_in);
       const secrets = [{ tree: { shared: token }, command: ses }];
@@ -465,8 +455,8 @@ const toEnvCommands = (sl: string[]): CommandTreeList => {
       const igit = useGitInstalled(egit, installation);
       out.push([igit, secrets]);
       // Update the shared key as instructed
-      if (found_shared && hasShared(found_shared.tree)) {
-        installation.shared = found_shared.tree.shared;
+      if (hasNewUser(opened.tree)) {
+        installation.shared = opened.tree.user.shared;
         const secrets = [{ tree: installation, command: inst }];
         out.push([igit, secrets]);
         const message = 'Updated shared user key.';
@@ -615,6 +605,7 @@ const toEnvCommands = (sl: string[]): CommandTreeList => {
   return { logs };
 })().then(({ logs }: Result) => {
   const fail_if = (x: LogItem) => x.level >= Log.error;
+  //const log_if = (x: LogItem) => x.level >= Log.trace;
   const log_if = (x: LogItem) => x.level >= Log.info;
   const errs = logs.reduce((list, item) => {
     if (isErrorItem(item) && fail_if(item)) {
@@ -629,7 +620,7 @@ const toEnvCommands = (sl: string[]): CommandTreeList => {
     throw new AggregateError(errs, 'ACTION: FAILURE.');
   }
 }).catch((e: any) => {
-  if (e instanceof AggregateError) console.error(e.message);
+  if (e instanceof AggregateError) console.error(e);
   else if (e instanceof Error) console.error(e);
   else console.error("Unknown Error Occured");
   process.exitCode = 1;

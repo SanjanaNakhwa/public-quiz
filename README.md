@@ -8,9 +8,19 @@ Developers can [test locally or remotely](#testing) and should evaluate [securit
 
 ## Setup
 
-Read this on [your new fork][FORK_THIS], set up [GitHub Pages](../../settings/pages) from "actions", and publish a [pre-release](../../releases/new).
+Read this on [your new fork][FORK_THIS], and [enable GitHub Actions](../../actions).
 
-<img width="700" alt="Set GitHub Pages from Actions and Publish Prerelease" src="https://user-images.githubusercontent.com/75504552/216326060-d31c0dab-0b16-4c4a-a8f6-9b21b4adcea3.png">
+![enable actions](https://user-images.githubusercontent.com/75504552/219168117-532b555a-c1ea-4745-92fc-a4ffbf4ada8a.png)
+
+Then, set up [GitHub Pages](../../settings/pages) from "actions" and set your ["github-pages" environment](../../settings/environments) to run on any branch or tag.
+
+![ok2](https://user-images.githubusercontent.com/75504552/219478867-95cbae17-8888-4348-9fbe-dec7a85e6726.png)
+
+
+Finally, publish a [pre-release](../../releases/new) (any tag name you create is fine).
+
+![ok1](https://user-images.githubusercontent.com/75504552/219478759-32a4a252-ab3b-4530-bc6a-e561bf933d64.png)
+
 
 ### Register
 
